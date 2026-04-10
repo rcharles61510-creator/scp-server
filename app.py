@@ -23,24 +23,50 @@ WORLD = {
 GLOBAL_CHAT = []
 O5_CHAT = []
 
+from flask import Flask, request, jsonify
+import base64
+
+app = Flask(__name__)
+
 # =========================
-# LOGIN (FIXED)
+# PERSISTENT SAFE USERS
+# =========================
+USERS = {
+    "raydin": {
+        "password": "0N3f0r4ll",
+        "clearance": 5,
+        "role": "O5"
+    }
+}
+
+# =========================
+# SAFE LOGIN (FIXED)
 # =========================
 @app.route("/login", methods=["POST"])
 def login():
-    data = request.json
-    u = data.get("user")
-    p = data.get("password")
+    data = request.json or {}
+
+    u = data.get("user", "")
+    p = data.get("password", "")
 
     user = USERS.get(u)
 
-    if user and user["password"] == p:
-        return jsonify({"ok": True, "user": user})
+    if not user:
+        return jsonify({"ok": False, "error": "USER_NOT_FOUND"})
 
-    return jsonify({"ok": False})
+    if user["password"] != p:
+        return jsonify({"ok": False, "error": "WRONG_PASSWORD"})
 
+    return jsonify({
+        "ok": True,
+        "user": {
+            "username": u,          # ✅ THIS WAS MISSING
+            "role": user["role"],
+            "clearance": user["clearance"]
+        }
+    })
 # =========================
-# USERS SYNC
+# USERS SYNC (SAFE)
 # =========================
 @app.route("/users", methods=["GET"])
 def get_users():
@@ -48,16 +74,28 @@ def get_users():
 
 @app.route("/users/update", methods=["POST"])
 def update_user():
-    data = request.json
+    data = request.json or {}
 
-    USERS[data["user"]] = {
-        "password": data["password"],
-        "clearance": int(data["clearance"]),
-        "role": data["role"]
-    }
+    try:
+        USERS[data["user"]] = {
+            "password": data["password"],
+            "clearance": int(data["clearance"]),
+            "role": data["role"]
+        }
+        return jsonify({"ok": True})
+    except:
+        return jsonify({"ok": False, "error": "BAD_DATA"})
 
-    return jsonify({"ok": True})
+# =========================
+# KEEP SERVER ALIVE RESPONSE
+# =========================
+@app.route("/", methods=["GET"])
+def home():
+    return jsonify({"status": "ONLINE"})
 
+# =========================
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=10000)
 # =========================
 # WORLD
 # =========================
